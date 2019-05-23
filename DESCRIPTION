@@ -1,0 +1,17 @@
+Package: bitmexws
+Title: BitMEX Websocket Connection and Utilities
+Version: 0.1
+Authors@R: person("Jonas", "Gu", email = "exoulster@gmail.com", role = c("aut", "cre"))
+Description: BitMEX Websocket Connection and Utilities
+Depends: R (>= 3.5.1)
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Suggests: testthat
+RoxygenNote: 6.1.1
+Imports: 
+    dplyr,
+    websocket,
+    mongolite,
+    jsonlite,
+    parallel
