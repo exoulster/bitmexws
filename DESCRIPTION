@@ -1,6 +1,6 @@
 Package: bitmexws
 Title: BitMEX Websocket Connection and Utilities
-Version: 0.1
+Version: 0.2
 Authors@R: person("Jonas", "Gu", email = "exoulster@gmail.com", role = c("aut", "cre"))
 Description: BitMEX Websocket Connection and Utilities
 Depends: R (>= 3.5.1)
@@ -14,4 +14,5 @@ Imports:
     websocket,
     mongolite,
     jsonlite,
-    parallel
+    parallel,
+    rjson

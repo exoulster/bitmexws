@@ -14,15 +14,27 @@
 read_jsonlines = function(filename) {
   ob.lines = readr::read_lines(filename)
   lapply(ob.lines, function(row) {
-    jsonlite::fromJSON(row, simplifyVector=FALSE)
+    # jsonlite::fromJSON(row, simplifyVector=FALSE)
+    rjson::fromJSON(row)
   })
 }
 
 
 #' @import dplyr
 #' @export
-to_jsonlines = function(ob) {
-  as.list() %>% unname() %>% jsonlite::toJSON(auto_unbox = TRUE)
+to_json = function(ob) {
+  ob %>% as.list() %>% unname() %>% rjson::toJSON()
+}
+
+#' @export
+as_json = function(x, ...) {
+  UseMethod('as_json')
+}
+
+#' @import dplyr
+#' @export
+as_json.orderBookL2 = function(ob) {
+  to_json(ob)
 }
 
 
@@ -32,24 +44,41 @@ to_jsonlines = function(ob) {
 read_msgs = function(filename) {
   ob.lines = readr::read_lines(filename)
   lapply(ob.lines, function(row) {
-    msg = jsonlite::fromJSON(row, simplifyVector=FALSE)
-    data = as_orderBookL2.list(msg$data)
-    msg$data = data
+    # msg = jsonlite::fromJSON(row, simplifyVector=FALSE)
+    msg = rjson::fromJSON(row)
+    msg$data = as_orderBookL2.list(msg$data)
+    msg = as_msg(msg)
     msg
-  }) %>% as_msgs()
+  })
 }
 
 
-#' Convert plain jsonlines to msgs object
-#' @param msgs msgs object
-#' @description msgs object is list of websocket message
+#' Convert plain json object to msg object
+#' @param msg msg object
+#' @description msg object is list of websocket message
 #' @export
-as_msgs = function(msgs) {
-  if (!inherits(msgs, 'msgs')) {
-    class(msgs) = c('msgs', class(msgs))
+as_msg = function(msg) {
+  if (!inherits(msg, 'msg')) {
+    class(msg) = c('msg', class(msg))
   }
-  msgs
+  msg
 }
+
+#' @export
+print.msg = function(x) {
+  cat(paste("BitMEX Websocket Message of", x[['table']]))
+  cat('\n')
+  cat(paste('Action:', x[['action']]))
+  cat('\n')
+  cat(paste('Timestamp:', x[['timestamp']]))
+  print(x['data'])
+}
+
+#' #' @export
+#' as_tibble.msg = function(msg) {
+#'   msg$data = list(as_tibble(msg$data))
+#'   as_tibble(msg[attr(msg, 'names')])
+#' }
 
 
 #' @export
@@ -76,6 +105,12 @@ as_orderBookL2.list = function(x) {
   x
 }
 
+#' @export
+as_orderBookL2.environment = function(x) {
+  if (inherits(x, 'orderBookL2')) return(x)
+  class(x) = c('orderBookL2', class(x))
+  x
+}
 
 #' @export
 as_orderBookL2.default = as_orderBookL2.list
@@ -93,6 +128,12 @@ as_tibble.orderBookL2 = function(ob) {
   do.call(bind_rows, as.list(ob))
 }
 
+#' @export
+as.list.orderBookL2 = function(ob) {
+  ob %>%
+    as.list.environment() %>%
+    unname()
+}
 
 # list_update = function(l1, l2) {
 #   e1 = as.environment(l1)
@@ -113,23 +154,18 @@ copy = function(x, ...) {
 }
 
 
+#' @import dplyr
 #' @export
 copy.orderBookL2 = function(ob) {
-  e = as.list(ob) %>%
-    as.environment()
-  if (!inherits(e, 'orderBookL2')) {
-    class(e) = c('orderBookL2', class(e))
-  }
-  return(e)
+  as.list.orderBookL2(ob) %>%
+    as_orderBookL2()
 }
-# sapply(names(new_ob), function(nm) { identical(ob[[nm]], new_ob[[nm]]) }) %>% all()
 
 
 #' @export
 modify = function(x, ...) {
   UseMethod('modify')
 }
-
 
 #' Update orderBookL2
 #' @details
@@ -205,7 +241,7 @@ accumulate_msgs = function(msgs, limit=0, strict=FALSE) {
     new_msg$data = ob
     new_msg$action = 'partial'
     return(new_msg)
-  }, msgs, obs[2:length(obs)])
+  }, msgs, obs[2:length(obs)], SIMPLIFY=FALSE)
 }
 
 
