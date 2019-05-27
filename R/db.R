@@ -66,11 +66,15 @@ import_trade = function(conn, filenames, full=FALSE) {
     imported = ''
   }
 
-  trade = lapply(filenames[!filenames %in% imported], function(fn) {
-    read_trade(fn)
-  }) %>% bind_rows()
-  trade
-  dbWriteTable(conn, 'trade', trade, append=TRUE, copy=TRUE)
+  if (length(imported) > 0) {
+    message(paste(length(imported), 'files already imported previously, ignored this time'))
+  }
+  lapply(filenames[!filenames %in% imported], function(fn) {
+    trade = read_trade(fn)
+    dbWriteTable(conn, 'trade', trade, append=TRUE, copy=TRUE)
+    message(paste('Imported', fn))
+  })
+  message(paste('Total count', tbl(conn, 'trade') %>% count() %>% pull()))
 
   meta_trade = tibble(
     filename = filenames,
