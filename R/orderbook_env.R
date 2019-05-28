@@ -7,6 +7,10 @@
 # fill size of delete to 0
 #
 
+id2price = function(id, symbol='XBTUSD') {
+  if (symbol=='XBTUSD') symbolIdx = 88
+  return(((100000000 * symbolIdx) - id) / 100)
+}
 
 
 #' @import dplyr
@@ -111,8 +115,16 @@ as_orderBookL2 = function(x, ...) {
 
 
 #' @export
-as_orderBookL2.list = function(x) {
+as_orderBookL2.list = function(x, na.fill=TRUE) {
   if (inherits(x, 'orderBookL2')) return(x)
+  if (na.fill)
+    x = lapply(x, function(order) {
+      if (is.null(order[['price']]))
+        order[['price']] = id2price(order[['id']])
+      if (is.null(order[['size']]))
+        order[['size']] = 0
+      order
+    })
   keys = c('symbol', 'id', 'side')
   names(x) = sapply(x, function(order) paste(order[keys], collapse='_'))
   x = as.environment(x)

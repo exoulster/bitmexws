@@ -131,10 +131,40 @@ import_trade = function(conn, filenames, full=FALSE) {
 #' }
 
 
+update_orderBookL2_SCD = function(conn, msg, info=FALSE) {
+  lapply(names(msg[['data']]), function(nm) {
+    start_time = Sys.time()
+    params = list(msg[['timestamp']], nm)
+    params
+    query = 'update "orderBookL2_SCD" set end_date = $1 where key = $2 and end_date is null'
+    res = dbSendStatement(conn, query, params)
+    ra = dbGetRowsAffected(res)
+    dbClearResult(res)
+    end_time = Sys.time()
+    if (info) message(paste(end_time - start_time, 'spent updating'))
+  })
+}
+
+insert_orderBookL2_SCD = function(conn, msg, info=FALSE) {
+  lapply(names(msg[['data']]), function(nm) {
+    start_time = Sys.time()
+    row = msg[['data']][[nm]]
+    query = 'insert into "orderBookL2_SCD" (key, symbol, id, side, price, size, start_date)
+    values ($1, $2, $3, $4, $5, $6, $7)'
+    params = list(nm, row[['symbol']], row[['id']], row[['side']], row[['price']], row[['size']], msg[['timestamp']])
+    res = dbSendStatement(conn, query, params)
+    ra = dbGetRowsAffected(res)
+    dbClearResult(res)
+    end_time = Sys.time()
+    if (info) message(paste(end_time-start_time, 'spent inserting'))
+  })
+}
+
+
 #' Import orderBookL2 data into DB as SCD table
 #' @import dplyr dbplyr RPostgres DBI
 #' @export
-import_orderBookL2_SCD = function(conn, filenames, full=FALSE) {
+import_orderBookL2_SCD = function(conn, filenames, full=FALSE, info=FALSE) {
   if (full) init_orderBookL2(conn)
 
   if (dbExistsTable(conn, 'meta_orderBookL2')) {
@@ -148,17 +178,7 @@ import_orderBookL2_SCD = function(conn, filenames, full=FALSE) {
   if (length(imported) > 0) {
     message(paste(length(imported), 'files already imported previously, ignored this time'))
   }
-  update_orderBookL2_SCD = function(conn, msg) {
-    lapply(names(msg[['data']]), function(nm) {
-      params = list(msg[['timestamp']], nm)
-      params
-      query = 'update "orderBookL2_SCD" set end_date = $1 where key = $2 and end_date is null'
-      res = dbSendStatement(conn, query, params)
-      ra = dbGetRowsAffected(res)
-      dbClearResult(res)
-      ra
-    })
-  }
+
 
   lapply(filenames[!filenames %in% imported], function(fn) {
     msgs = bitmexws::read_msgs(fn)
@@ -166,12 +186,14 @@ import_orderBookL2_SCD = function(conn, filenames, full=FALSE) {
     lapply(msgs, function(msg) {
       scd = to_scd(msg[['data']], timestamp=msg[['timestamp']])
       if (msg[['action']] %in% c('partial', 'insert')) {
-        dbWriteTable(conn, 'orderBookL2_SCD', scd, append=TRUE, copy=TRUE)
+        # dbWriteTable(conn, 'orderBookL2_SCD', scd, append=TRUE, copy=TRUE)
+        insert_orderBookL2_SCD(conn, msg, info=info)
       } else if (msg[['action']] == 'update') {
-        update_orderBookL2_SCD(conn, msg) # update set time
-        dbWriteTable(conn, 'orderBookL2_SCD', scd, append=TRUE, copy=TRUE) # insert new
+        update_orderBookL2_SCD(conn, msg, info=info) # update set time
+        insert_orderBookL2_SCD(conn, msg, info=info)
+        # dbWriteTable(conn, 'orderBookL2_SCD', scd, append=TRUE, copy=TRUE) # insert new
       } else if (msg[['action']] == 'delete') {
-        update_orderBookL2_SCD(conn, msg) # update set time
+        update_orderBookL2_SCD(conn, msg, info=info) # update set time
       } else {
         stop('no action')
       }
