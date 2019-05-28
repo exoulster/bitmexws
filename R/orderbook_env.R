@@ -20,6 +20,20 @@ read_jsonlines = function(filename) {
 }
 
 
+#' Read msgs from file
+#' @import dplyr
+#' @export
+read_msgs = function(filename) {
+  ob.lines = readr::read_lines(filename)
+  lapply(ob.lines, function(row) {
+    msg = rjson::fromJSON(row)
+    msg$data = as_orderBookL2.list(msg$data)
+    msg = as_msg(msg)
+    msg
+  })
+}
+
+
 #' @import dplyr
 #' @export
 to_json = function(ob) {
@@ -38,18 +52,18 @@ as_json.orderBookL2 = function(ob) {
 }
 
 
-#' Read msgs from file
 #' @import dplyr
 #' @export
-read_msgs = function(filename) {
-  ob.lines = readr::read_lines(filename)
-  lapply(ob.lines, function(row) {
-    # msg = jsonlite::fromJSON(row, simplifyVector=FALSE)
-    msg = rjson::fromJSON(row)
-    msg$data = as_orderBookL2.list(msg$data)
-    msg = as_msg(msg)
-    msg
-  })
+to_scd = function(ob, timestamp=NULL) {
+  scd = ob %>%
+    as_tibble() %>%
+    mutate(key=paste(symbol, id, side, sep='_'))
+  if(!is.null(timestamp))
+    scd$start_date = timestamp
+  else
+    scd$start_date = lubridate::now()
+  scd$end_date = NA
+  return(scd)
 }
 
 
@@ -71,6 +85,7 @@ print.msg = function(x) {
   cat(paste('Action:', x[['action']]))
   cat('\n')
   cat(paste('Timestamp:', x[['timestamp']]))
+  cat('\n')
   print(x['data'])
 }
 
@@ -134,18 +149,6 @@ as.list.orderBookL2 = function(ob) {
     as.list.environment() %>%
     unname()
 }
-
-# list_update = function(l1, l2) {
-#   e1 = as.environment(l1)
-#   e2 = as.environment(l2)
-#   lapply(names(e2), function(nm) {
-#     e1[[nm]] = e2[[nm]]
-#   })
-#   lst = as.list(e1)
-#   # lst = lst[c('symbol', 'id', 'side', 'size', 'price')]
-#   lst = lst[!sapply(lst, is.null)]
-#   return(lst)
-# }
 
 
 #' @export
