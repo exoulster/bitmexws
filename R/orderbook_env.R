@@ -56,19 +56,19 @@ as_json.orderBookL2 = function(ob) {
 }
 
 
-#' @import dplyr
-#' @export
-to_scd = function(ob, timestamp=NULL) {
-  scd = ob %>%
-    as_tibble() %>%
-    mutate(key=paste(symbol, id, side, sep='_'))
-  if(!is.null(timestamp))
-    scd$start_date = timestamp
-  else
-    scd$start_date = lubridate::now()
-  scd$end_date = NA
-  return(scd)
-}
+#' #' @import dplyr
+#' #' @export
+#' to_scd = function(ob, timestamp=NULL) {
+#'   scd = ob %>%
+#'     as_tibble() %>%
+#'     mutate(key=paste(symbol, id, side, sep='_'))
+#'   if(!is.null(timestamp))
+#'     scd$start_date = timestamp
+#'   else
+#'     scd$start_date = lubridate::now()
+#'   scd$end_date = NA
+#'   return(scd)
+#' }
 
 
 #' Convert plain json object to msg object
@@ -93,11 +93,97 @@ print.msg = function(x) {
   print(x['data'])
 }
 
-#' #' @export
-#' as_tibble.msg = function(msg) {
-#'   msg$data = list(as_tibble(msg$data))
-#'   as_tibble(msg[attr(msg, 'names')])
-#' }
+#' @export
+as_scd = function(msg) {
+  UseMethod('as_scd')
+}
+
+#' @import tidyr dplyr
+#' @export
+as_scd.msg = function(msg) {
+  scd = as_tibble(msg$data) %>%
+    mutate(
+      action = msg[['action']],
+      start_time = msg[['timestamp']],
+      end_time = NA,
+    )
+  if (!inherits(scd, 'scd'))
+    class(scd) = c('scd', class(scd))
+  return(scd)
+}
+
+#' @import tidyr dplyr
+#' @export
+as_scd.orderBookL2 = function(ob, action, timestamp) {
+  scd = as_tibble(ob) %>%
+    mutate(
+      action = action,
+      start_time = timestamp,
+      end_time = NA
+    )
+  if (!inherits(scd, 'scd'))
+    class(scd) = c('scd', class(scd))
+  return(scd)
+}
+
+#' @import tidyr dplyr
+#' @export
+as_scd.data.frame = function(scd) {
+  if (!inherits(scd, 'scd'))
+    class(scd) = c('scd', class(scd))
+  return(scd)
+}
+
+
+#' @export
+merge_scd = function(x, y) {
+  UseMethod('merge_scd')
+}
+
+#' @import tidyr dplyr
+#' @export
+merge_scd.scd = function(scd.origin, scd.increment) {
+  if (nrow(scd.origin)==0) {
+    return(list(
+      to_update = scd.origin,
+      to_insert = scd.increment
+    ))
+  }
+  keys = syms(c('symbol', 'id', 'side'))
+  scd.origin = scd.origin %>% mutate(tag='origin')
+  scd.increment = scd.increment %>% mutate(tag='increment')
+  dfr = scd.origin %>%
+    bind_rows(scd.increment) %>%
+    group_by(!!!keys) %>%
+    mutate(end_time = lead(start_time)) %>%
+    ungroup()
+  scd.update = dfr %>%
+    filter(tag=='origin', !is.na(end_time)) %>%
+    select(-tag)
+  scd.insert = dfr %>%
+    filter(tag == 'increment') %>%
+    select(-tag)
+  list(
+    to_update = scd.update,
+    to_insert = scd.insert
+  )
+}
+
+#' @import tidyr dplyr
+#' @export
+merge_scd.list = function(msgs) {
+  keys = syms(c('symbol', 'id', 'side'))
+  lapply(msgs, as_scd) %>%
+    bind_rows() %>%
+    group_by(!!!keys) %>%
+    mutate(
+      end_time = lead(start_time)
+    ) %>%
+    ungroup() %>%
+    mutate(
+      id = as.character(id)
+    )
+}
 
 
 #' @export
@@ -220,6 +306,11 @@ modify.orderBookL2 = function(ob, inc, action='update', strict=FALSE, copy=FALSE
   }
   return(ob)
 }
+
+#
+# merge_tibble = function(ob, inc, action='update') {
+#
+# }
 
 
 #' @import dplyr

@@ -2,7 +2,20 @@
 % Please edit documentation in R/orderbook_env.R
 \name{as_msg}
 \alias{as_msg}
-\title{Convert plain json object to msg object}
+\title{#' @import dplyr
+#' @export
+to_scd = function(ob, timestamp=NULL) {
+  scd = ob %>%
+    as_tibble() %>%
+    mutate(key=paste(symbol, id, side, sep='_'))
+  if(!is.null(timestamp))
+    scd$start_date = timestamp
+  else
+    scd$start_date = lubridate::now()
+  scd$end_date = NA
+  return(scd)
+}
+Convert plain json object to msg object}
 \usage{
 as_msg(msg)
 }

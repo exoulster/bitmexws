@@ -14,7 +14,24 @@ inc.partial = msg.partial$data
 inc.update = msg.update$data
 inc.delete = msg.delete$data
 inc.insert = msg.insert$date
+scd.origin = as_scd.msg(msgs[[1]])
+scd.increment = as_scd.msg(msgs[[2]])
 
+
+test_that('as_scd', {
+  expect_true(as_scd(msg.update) %>% pull(end_time) %>% is.na() %>% all())
+  expect_equal(as_scd(msg.update) %>% nrow(), 2)
+  expect_true(as_scd(msg.update) %>% inherits('scd'))
+  expect_true(as_scd.orderBookL2(inc.update, action='update', timestamp='20190101') %>% pull() %>% is.na() %>% all())
+  expect_equal(as_scd.orderBookL2(inc.update, action='update', timestamp='20190101') %>% nrow(), 2)
+  expect_true(as_scd.orderBookL2(inc.update, action='update', timestamp='20190101') %>% inherits('scd'))
+})
+
+test_that('merge', {
+  res = merge(as_scd(msg.partial), as_scd(msg.update))
+  expect_equal(names(res) = c('to_update', 'to_insert'))
+  expect_true(res$to_insert %>% pull() %>% is.na() %>% all())
+})
 
 test_that('new_orderBookL2', {
   ob = new_orderBookL2()
